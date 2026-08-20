@@ -5,10 +5,11 @@ import click
 from shutil import copyfile
 from datetime import datetime
 from jinja2 import Environment, BaseLoader, FileSystemLoader
-from docsible.markdown_template import static_template, collection_template
+from docsible.templates.role import ROLE_TEMPLATE
+from docsible.templates.collection import COLLECTION_TEMPLATE
 from docsible.utils.mermaid import generate_mermaid_playbook, generate_mermaid_role_tasks_per_file
 from docsible.utils.yaml import load_yaml_generic, load_yaml_files_from_dir_custom, get_task_comments, get_task_line_numbers
-from docsible.utils.special_tasks_keys import process_special_task_keys
+from docsible.utils.tasks import process_special_task_keys
 from docsible.utils.git import get_repo_info
 
 DOCSIBLE_START_TAG = "<!-- DOCSIBLE START -->"
@@ -81,7 +82,7 @@ def render_readme_template(collection_metadata, md_collection_template, roles_in
         template = env.get_template(template_file)
     else:
         env = Environment(loader=BaseLoader)
-        template = env.from_string(collection_template)
+        template = env.from_string(COLLECTION_TEMPLATE)
     data = {
         'collection': collection_metadata,
         'roles': roles_info
@@ -333,7 +334,7 @@ def document_role(role_path, playbook_content, generate_graph, no_backup, no_doc
         template = env.get_template(template_file)
     else:
         env = Environment(loader=BaseLoader)
-        template = env.from_string(static_template)
+        template = env.from_string(ROLE_TEMPLATE)
     new_content = template.render(
         role=role_info, mermaid_code_per_file=mermaid_code_per_file)
     new_content = manage_docsible_tags(new_content)
