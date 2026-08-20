@@ -46,7 +46,7 @@ timestamp = datetime.now().strftime(TIMESTAMP_FORMAT)
 
 
 def get_version():
-    return "0.8.0"
+    return "0.8.1"
 
 
 def manage_docsible_file_keys(docsible_path):
