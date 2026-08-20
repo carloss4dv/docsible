@@ -14,13 +14,39 @@ Usage:
     python scripts/change_version.py revert
 """
 
-import os
 import re
 import sys
 import logging
 import argparse
+from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+
+SEMVER_PATTERN = r"^(\d+)\.(\d+)\.(\d+)$"
+
+CLI_FILE = Path("docsible") / "cli.py"
+SETUP_FILE = Path("setup.py")
+PYPROJECT_FILE = Path("pyproject.toml")
+
+CLI_VERSION_PATTERN = r'(def\s+get_version\(\):\s+return\s+["\'])(\d+\.\d+\.\d+)(["\'])'
+SETUP_VERSION_PATTERN = r'(version\s*=\s*["\'])(\d+\.\d+\.\d+)(["\'])'
+PYPROJECT_VERSION_PATTERN = r'(version\s*=\s*["\'])(\d+\.\d+\.\d+)(["\'])'
+
+VERSION_REPLACEMENT = r'\g<1>{}\g<3>'
+
+ERROR_INVALID_VERSION = "Invalid version format: {}"
+ERROR_PATCH_UNDERFLOW = "Cannot revert version: patch version is already 0."
+ERROR_FILE_MISSING = "File {} does not exist."
+ERROR_VERSION_NOT_FOUND = "Version string not found in {}"
+ERROR_CLI_READ = "Error reading {}: {}"
+ERROR_CLI_VERSION_NOT_FOUND = "Could not find version string in docsible/cli.py"
+
+LOG_CURRENT_VERSION = "Current version in cli.py: {}"
+LOG_BUMP_VERSION = "Bumping version to: {}"
+LOG_REVERT_VERSION = "Reverting version to: {}"
+LOG_FILE_UPDATED = "Updated {}"
+LOG_VERSION_COMPLETE = "Version update complete. New version: {}"
 
 
 def change_version(version_str: str, bump: bool = True) -> str:
@@ -37,22 +63,21 @@ def change_version(version_str: str, bump: bool = True) -> str:
     Raises:
         ValueError: If the version format is invalid.
     """
-    semver_pattern = r"^(\d+)\.(\d+)\.(\d+)$"
-    match = re.match(semver_pattern, version_str)
+    match = re.match(SEMVER_PATTERN, version_str)
     if not match:
-        raise ValueError(f"Invalid version format: {version_str}")
+        raise ValueError(ERROR_INVALID_VERSION.format(version_str))
     major, minor, patch = map(int, match.groups())
     if bump:
         patch += 1
     else:
         if patch == 0:
-            logging.error("Cannot revert version: patch version is already 0.")
+            logging.error(ERROR_PATCH_UNDERFLOW)
             sys.exit(1)
         patch -= 1
     return f"{major}.{minor}.{patch}"
 
 
-def update_file(file_path: str, pattern: str, replacement_format: str, new_version: str):
+def update_file(file_path: Path, pattern: str, replacement_format: str, new_version: str):
     """
     Updates a file by replacing the version string with the new version.
 
@@ -62,19 +87,19 @@ def update_file(file_path: str, pattern: str, replacement_format: str, new_versi
         replacement_format (str): A format string using explicit group references.
         new_version (str): The new version string to inject.
     """
-    if not os.path.exists(file_path):
-        logging.error(f"File {file_path} does not exist.")
+    if not file_path.exists():
+        logging.error(ERROR_FILE_MISSING.format(file_path))
         sys.exit(1)
-    with open(file_path, "r") as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
     if not re.search(pattern, content):
-        logging.error(f"Version string not found in {file_path}")
+        logging.error(ERROR_VERSION_NOT_FOUND.format(file_path))
         sys.exit(1)
     new_content = re.sub(
         pattern, replacement_format.format(new_version), content)
-    with open(file_path, "w") as f:
+    with open(file_path, "w", encoding="utf-8") as f:
         f.write(new_content)
-    logging.info(f"Updated {file_path}")
+    logging.info(LOG_FILE_UPDATED.format(file_path))
 
 
 def main():
@@ -88,49 +113,35 @@ def main():
     )
     args = parser.parse_args()
 
-    # Files to update.
-    cli_file = os.path.join("docsible", "cli.py")
-    setup_file = "setup.py"
-    pyproject_file = "pyproject.toml"
-
-    # Define regex patterns and replacement strings using explicit group references.
-    cli_pattern = r'(def\s+get_version\(\):\s+return\s+["\'])(\d+\.\d+\.\d+)(["\'])'
-    cli_replacement = r'\g<1>{}\g<3>'
-    setup_pattern = r'(version\s*=\s*["\'])(\d+\.\d+\.\d+)(["\'])'
-    setup_replacement = r'\g<1>{}\g<3>'
-    pyproject_pattern = r'(version\s*=\s*["\'])(\d+\.\d+\.\d+)(["\'])'
-    pyproject_replacement = r'\g<1>{}\g<3>'
-
     # Read the current version from cli.py.
     try:
-        with open(cli_file, "r") as f:
+        with open(CLI_FILE, "r", encoding="utf-8") as f:
             cli_content = f.read()
     except Exception as e:
-        logging.error(f"Error reading {cli_file}: {e}")
+        logging.error(ERROR_CLI_READ.format(CLI_FILE, e))
         sys.exit(1)
 
-    cli_match = re.search(cli_pattern, cli_content)
+    cli_match = re.search(CLI_VERSION_PATTERN, cli_content)
     if not cli_match:
-        logging.error("Could not find version string in docsible/cli.py")
+        logging.error(ERROR_CLI_VERSION_NOT_FOUND)
         sys.exit(1)
     current_version = cli_match.group(2)
-    logging.info(f"Current version in cli.py: {current_version}")
+    logging.info(LOG_CURRENT_VERSION.format(current_version))
 
     # Decide the new version based on the requested action.
     if args.action == "bump":
         new_version = change_version(current_version, bump=True)
-        logging.info(f"Bumping version to: {new_version}")
+        logging.info(LOG_BUMP_VERSION.format(new_version))
     else:
         new_version = change_version(current_version, bump=False)
-        logging.info(f"Reverting version to: {new_version}")
+        logging.info(LOG_REVERT_VERSION.format(new_version))
 
     # Update all files with the new version.
-    update_file(cli_file, cli_pattern, cli_replacement, new_version)
-    update_file(setup_file, setup_pattern, setup_replacement, new_version)
-    update_file(pyproject_file, pyproject_pattern,
-                pyproject_replacement, new_version)
+    update_file(CLI_FILE, CLI_VERSION_PATTERN, VERSION_REPLACEMENT, new_version)
+    update_file(SETUP_FILE, SETUP_VERSION_PATTERN, VERSION_REPLACEMENT, new_version)
+    update_file(PYPROJECT_FILE, PYPROJECT_VERSION_PATTERN, VERSION_REPLACEMENT, new_version)
 
-    logging.info(f"Version update complete. New version: {new_version}")
+    logging.info(LOG_VERSION_COMPLETE.format(new_version))
 
 
 if __name__ == "__main__":
