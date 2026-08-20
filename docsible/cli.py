@@ -7,10 +7,10 @@ from datetime import datetime
 from jinja2 import Environment, BaseLoader, FileSystemLoader
 from docsible.templates.role import ROLE_TEMPLATE
 from docsible.templates.collection import COLLECTION_TEMPLATE
-from docsible.utils.mermaid import generate_mermaid_playbook, generate_mermaid_role_tasks_per_file
-from docsible.utils.yaml import load_yaml_generic, load_yaml_files_from_dir_custom, get_task_comments, get_task_line_numbers
-from docsible.utils.tasks import process_special_task_keys
-from docsible.utils.git import get_repo_info
+from docsible.mermaid import generate_mermaid_playbook, generate_mermaid_role_tasks_per_file
+from docsible.yaml import load_yaml_generic, load_yaml_files_from_dir_custom, get_task_comments, get_task_line_numbers
+from docsible.tasks import process_special_task_keys
+from docsible.git import get_repo_info
 
 DOCSIBLE_START_TAG = "<!-- DOCSIBLE START -->"
 DOCSIBLE_END_TAG = "<!-- DOCSIBLE END -->"
