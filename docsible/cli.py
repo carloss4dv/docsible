@@ -9,6 +9,7 @@ from docsible.templates.role import ROLE_TEMPLATE
 from docsible.templates.collection import COLLECTION_TEMPLATE
 from docsible.constants import (
     ARGUMENT_SPECS_FILE_NAMES,
+    MARKDOWN_EXTENSION,
     COLLECTION_ROLES_DIR,
     DATE_FORMAT,
     DEFAULT_OUTPUT_FILE,
@@ -20,11 +21,19 @@ from docsible.constants import (
     DOCSIBLE_START_TAG,
     GALAXY_FILE_NAMES,
     META_MAIN_FILE_NAMES,
+    REPO_INFO_KEY_BRANCH,
+    REPO_INFO_KEY_REPOSITORY,
+    REPO_INFO_KEY_REPOSITORY_TYPE,
     REPOSITORY_URL_DETECT_MODE,
     ROLE_DEFAULTS_DIR,
     ROLE_META_DIR,
     ROLE_TASKS_DIR,
     ROLE_VARS_DIR,
+    TASK_INFO_KEY_COMMENTS,
+    TASK_INFO_KEY_FILE,
+    TASK_INFO_KEY_LINES,
+    TASK_INFO_KEY_MERMAID,
+    TASK_INFO_KEY_TASKS,
     TIMESTAMP_FORMAT,
     YAML_FILE_EXTENSIONS,
 )
@@ -127,11 +136,11 @@ def document_collection_roles(collection_path, playbook, graph, no_backup, no_do
     except Exception as e:
         print(f"[WARN] Could not get Git info: {e}")
         git_info = {}
-    repository_url = git_info.get("repository") if git_info else None
+    repository_url = git_info.get(REPO_INFO_KEY_REPOSITORY) if git_info else None
     repo_branch = repo_branch or (
-        git_info.get("branch") if git_info else DEFAULT_REPOSITORY_BRANCH)
+        git_info.get(REPO_INFO_KEY_BRANCH) if git_info else DEFAULT_REPOSITORY_BRANCH)
     repo_type = repo_type or (
-        git_info.get("repository_type") if git_info else None)
+        git_info.get(REPO_INFO_KEY_REPOSITORY_TYPE) if git_info else None)
 
     for root, dirs, files in os.walk(collection_path):
         galaxy_file = next(
@@ -150,7 +159,7 @@ def document_collection_roles(collection_path, playbook, graph, no_backup, no_do
             collection_metadata['repository_branch'] = repo_branch
 
             if os.path.exists(readme_path) and not no_backup:
-                backup_path = f"{readme_path[:readme_path.lower().rfind('.md')]}_backup_{timestamp}.md"
+                backup_path = f"{readme_path[:readme_path.lower().rfind(MARKDOWN_EXTENSION)]}_backup_{timestamp}{MARKDOWN_EXTENSION}"
                 copyfile(readme_path, backup_path)
                 print(f"Backup of existing {output} created at: {backup_path}")
 
@@ -263,17 +272,17 @@ def document_role(role_path, playbook_content, generate_graph, no_backup, no_doc
         except Exception as e:
             print(f"[WARN] Could not get Git info: {e}")
             git_info = {}
-        repository_url = git_info.get("repository") if git_info else None
+        repository_url = git_info.get(REPO_INFO_KEY_REPOSITORY) if git_info else None
         repo_branch = repo_branch or (
-            git_info.get("branch") if git_info else DEFAULT_REPOSITORY_BRANCH)
+            git_info.get(REPO_INFO_KEY_BRANCH) if git_info else DEFAULT_REPOSITORY_BRANCH)
         repo_type = repo_type or (
-            git_info.get("repository_type") if git_info else None)
+            git_info.get(REPO_INFO_KEY_REPOSITORY_TYPE) if git_info else None)
 
     role_info = {
         "name": role_name,
         "defaults": defaults_data,
         "vars": vars_data,
-        "tasks": [],
+        TASK_INFO_KEY_TASKS: [],
         "meta": load_yaml_generic(meta_path) or {},
         "playbook": {"content": playbook_content, "graph":
                      generate_mermaid_playbook(yaml.safe_load(playbook_content)) if generate_graph and playbook_content else None},
@@ -286,7 +295,7 @@ def document_role(role_path, playbook_content, generate_graph, no_backup, no_doc
     }
 
     tasks_dir = os.path.join(role_path, ROLE_TASKS_DIR)
-    role_info["tasks"] = []
+    role_info[TASK_INFO_KEY_TASKS] = []
 
     if os.path.exists(tasks_dir) and os.path.isdir(tasks_dir):
         for dirpath, dirnames, filenames in os.walk(tasks_dir):
@@ -296,13 +305,18 @@ def document_role(role_path, playbook_content, generate_graph, no_backup, no_doc
                     tasks_data = load_yaml_generic(file_path)
                     if tasks_data:
                         relative_path = os.path.relpath(file_path, tasks_dir)
-                        task_info = {'file': relative_path,
-                                     'tasks': [], 'mermaid': [], "comments": [], 'lines': []}
+                        task_info = {
+                            TASK_INFO_KEY_FILE: relative_path,
+                            TASK_INFO_KEY_TASKS: [],
+                            TASK_INFO_KEY_MERMAID: [],
+                            TASK_INFO_KEY_COMMENTS: [],
+                            TASK_INFO_KEY_LINES: [],
+                        }
                         if comments:
-                            task_info['comments'] = get_task_comments(
+                            task_info[TASK_INFO_KEY_COMMENTS] = get_task_comments(
                                 file_path)
                         if task_line:
-                            task_info['lines'] = get_task_line_numbers(
+                            task_info[TASK_INFO_KEY_LINES] = get_task_line_numbers(
                                 file_path)
                         if not isinstance(tasks_data, list):
                             print(
@@ -316,15 +330,15 @@ def document_role(role_path, playbook_content, generate_graph, no_backup, no_doc
                             if task and len(task.keys()) > 0:
                                 processed_tasks = process_special_task_keys(
                                     task)
-                                task_info['tasks'].extend(processed_tasks)
-                                task_info['mermaid'].extend([task])
+                                task_info[TASK_INFO_KEY_TASKS].extend(processed_tasks)
+                                task_info[TASK_INFO_KEY_MERMAID].extend([task])
 
-                        role_info["tasks"].append(task_info)
+                            role_info[TASK_INFO_KEY_TASKS].append(task_info)
 
     if os.path.exists(readme_path):
         if not no_backup:
             backup_readme_path = os.path.join(
-                role_path, f"{output[:output.lower().rfind('.md')]}_backup_{timestamp}.md")
+                role_path, f"{output[:output.lower().rfind(MARKDOWN_EXTENSION)]}_backup_{timestamp}{MARKDOWN_EXTENSION}")
             copyfile(readme_path, backup_readme_path)
             print(f'Readme file backed up as: {backup_readme_path}')
         if not append:
@@ -333,7 +347,7 @@ def document_role(role_path, playbook_content, generate_graph, no_backup, no_doc
     mermaid_code_per_file = {}
     if generate_graph:
         mermaid_code_per_file = generate_mermaid_role_tasks_per_file(
-            role_info["tasks"])
+            role_info[TASK_INFO_KEY_TASKS])
 
     # Render the static template
     if md_role_template:
