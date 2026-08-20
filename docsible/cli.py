@@ -8,15 +8,25 @@ from jinja2 import Environment, BaseLoader, FileSystemLoader
 from docsible.templates.role import ROLE_TEMPLATE
 from docsible.templates.collection import COLLECTION_TEMPLATE
 from docsible.constants import (
+    ARGUMENT_SPECS_FILE_NAMES,
+    COLLECTION_ROLES_DIR,
     DATE_FORMAT,
     DEFAULT_OUTPUT_FILE,
     DEFAULT_PLAYBOOK_PATH,
     DEFAULT_REPOSITORY_BRANCH,
+    DOCSIBLE_METADATA_FILE,
     DOCSIBLE_DEFAULT_METADATA,
     DOCSIBLE_END_TAG,
     DOCSIBLE_START_TAG,
     GALAXY_FILE_NAMES,
+    META_MAIN_FILE_NAMES,
+    REPOSITORY_URL_DETECT_MODE,
+    ROLE_DEFAULTS_DIR,
+    ROLE_META_DIR,
+    ROLE_TASKS_DIR,
+    ROLE_VARS_DIR,
     TIMESTAMP_FORMAT,
+    YAML_FILE_EXTENSIONS,
 )
 from docsible.mermaid import generate_mermaid_playbook, generate_mermaid_role_tasks_per_file
 from docsible.yaml import load_yaml_generic, load_yaml_files_from_dir_custom, get_task_comments, get_task_line_numbers
@@ -130,7 +140,7 @@ def document_collection_roles(collection_path, playbook, graph, no_backup, no_do
             galaxy_path = os.path.join(root, galaxy_file)
             with open(galaxy_path, 'r') as f:
                 collection_metadata = yaml.safe_load(f)
-                if output == "README.md":
+                if output == DEFAULT_OUTPUT_FILE:
                     readme_path = os.path.join(
                         root, collection_metadata.get('readme', output))
                 else:
@@ -144,7 +154,7 @@ def document_collection_roles(collection_path, playbook, graph, no_backup, no_do
                 copyfile(readme_path, backup_path)
                 print(f"Backup of existing {output} created at: {backup_path}")
 
-            roles_dir = os.path.join(root, 'roles')
+            roles_dir = os.path.join(root, COLLECTION_ROLES_DIR)
             roles_info = []
             if os.path.exists(roles_dir) and os.path.isdir(roles_dir):
                 for role in os.listdir(roles_dir):
@@ -221,20 +231,21 @@ def doc_the_role(role, collection, playbook, graph, no_backup, no_docsible, comm
 def document_role(role_path, playbook_content, generate_graph, no_backup, no_docsible, comments, task_line, md_role_template, belongs_to_collection, append, output, repository_url, repo_type, repo_branch):
     role_name = os.path.basename(role_path)
     readme_path = os.path.join(role_path, output)
-    meta_path = os.path.join(role_path, "meta", "main.yml")
-    docsible_path = os.path.join(role_path, ".docsible")
-    argument_specs_path = os.path.join(role_path, "meta", "argument_specs.yml")
+    meta_path = os.path.join(role_path, ROLE_META_DIR, META_MAIN_FILE_NAMES[0])
+    docsible_path = os.path.join(role_path, DOCSIBLE_METADATA_FILE)
+    argument_specs_path = os.path.join(
+        role_path, ROLE_META_DIR, ARGUMENT_SPECS_FILE_NAMES[0])
 
     if not no_docsible:
         manage_docsible_file_keys(docsible_path)
 
     # Check if meta/main.yml exist, otherwise try meta/main.yaml
     if not os.path.exists(meta_path):
-        meta_path = os.path.join(role_path, "meta", "main.yaml")
+        meta_path = os.path.join(role_path, ROLE_META_DIR, META_MAIN_FILE_NAMES[1])
 
     if not os.path.exists(argument_specs_path):
         argument_specs_path = os.path.join(
-            role_path, "meta", "argument_specs.yaml")
+            role_path, ROLE_META_DIR, ARGUMENT_SPECS_FILE_NAMES[1])
 
     if os.path.exists(argument_specs_path):
         argument_specs = load_yaml_generic(argument_specs_path)
@@ -242,11 +253,11 @@ def document_role(role_path, playbook_content, generate_graph, no_backup, no_doc
         argument_specs = None
 
     defaults_data = load_yaml_files_from_dir_custom(
-        os.path.join(role_path, "defaults")) or []
+        os.path.join(role_path, ROLE_DEFAULTS_DIR)) or []
     vars_data = load_yaml_files_from_dir_custom(
-        os.path.join(role_path, "vars")) or []
+        os.path.join(role_path, ROLE_VARS_DIR)) or []
 
-    if repository_url == "detect":
+    if repository_url == REPOSITORY_URL_DETECT_MODE:
         try:
             git_info = get_repo_info(role_path) or {}
         except Exception as e:
@@ -274,13 +285,13 @@ def document_role(role_path, playbook_content, generate_graph, no_backup, no_doc
         "argument_specs": argument_specs
     }
 
-    tasks_dir = os.path.join(role_path, "tasks")
+    tasks_dir = os.path.join(role_path, ROLE_TASKS_DIR)
     role_info["tasks"] = []
 
     if os.path.exists(tasks_dir) and os.path.isdir(tasks_dir):
         for dirpath, dirnames, filenames in os.walk(tasks_dir):
             for task_file in filenames:
-                if task_file.endswith(".yml") or task_file.endswith(".yaml"):
+                if task_file.endswith(YAML_FILE_EXTENSIONS):
                     file_path = os.path.join(dirpath, task_file)
                     tasks_data = load_yaml_generic(file_path)
                     if tasks_data:

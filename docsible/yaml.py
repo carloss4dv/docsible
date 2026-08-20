@@ -2,6 +2,7 @@
 import os
 import yaml
 import re
+from docsible.constants import YAML_FILE_EXTENSIONS
 
 
 def vault_constructor(loader, node):
@@ -308,7 +309,7 @@ def load_yaml_files_from_dir_custom(dir_path):
     collected_data = []
 
     def process_yaml_file(full_path, dir_path):
-        if full_path.endswith((".yml", ".yaml")):
+        if full_path.endswith(YAML_FILE_EXTENSIONS):
             file_data = load_yaml_file_custom(full_path)
             if file_data:
                 relative_path = os.path.relpath(full_path, dir_path)

@@ -6,8 +6,21 @@ DOCSIBLE_END_TAG = "<!-- DOCSIBLE END -->"
 DEFAULT_PLAYBOOK_PATH = "tests/test.yml"
 DEFAULT_OUTPUT_FILE = "README.md"
 DEFAULT_REPOSITORY_BRANCH = "main"
+REPOSITORY_URL_DETECT_MODE = "detect"
 
 GALAXY_FILE_NAMES = ("galaxy.yml", "galaxy.yaml")
+YAML_FILE_EXTENSIONS = (".yml", ".yaml")
+
+COLLECTION_ROLES_DIR = "roles"
+
+ROLE_META_DIR = "meta"
+ROLE_DEFAULTS_DIR = "defaults"
+ROLE_VARS_DIR = "vars"
+ROLE_TASKS_DIR = "tasks"
+
+DOCSIBLE_METADATA_FILE = ".docsible"
+META_MAIN_FILE_NAMES = ("main.yml", "main.yaml")
+ARGUMENT_SPECS_FILE_NAMES = ("argument_specs.yml", "argument_specs.yaml")
 
 TIMESTAMP_FORMAT = "%Y%m%d%H%M%S"
 DATE_FORMAT = "%Y/%m/%d"
