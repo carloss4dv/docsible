@@ -4,6 +4,29 @@ import subprocess
 from pathlib import Path
 from typing import Dict
 from urllib.parse import urlparse, urlunparse
+from docsible.constants import (
+    DEFAULT_REPOSITORY_TYPE,
+    GIT_COMMAND_TIMEOUT_SECONDS,
+    GIT_CMD_CURRENT_BRANCH,
+    GIT_CMD_REMOTE_URL,
+    GIT_CMD_REPO_CHECK,
+    GIT_CONTEXT_FLAG,
+    GIT_EXECUTABLE,
+    GIT_TRUE_VALUE,
+    REPO_INFO_KEY_BRANCH,
+    REPO_INFO_KEY_REPOSITORY,
+    REPO_INFO_KEY_REPOSITORY_TYPE,
+    REPOSITORY_TYPE_BY_HOST,
+    URL_CREDENTIAL_SEPARATOR,
+    URL_EMPTY,
+    URL_GIT_SUFFIX,
+    URL_PATH_SEPARATOR,
+    URL_SCP_PATTERN,
+    URL_SCHEME_GIT,
+    URL_SCHEME_HTTPS,
+    URL_SCHEME_SSH,
+    URL_SSH_PREFIX,
+)
 
 
 class GitInfoError(Exception):
@@ -27,11 +50,11 @@ class NotGitRepositoryError(GitInfoError):
 def clean_and_standardize_url(url: str) -> str:
     processed_url = url
 
-    scp_like_match = re.match(r"^git@([^:]+):(.*)$", processed_url)
+    scp_like_match = re.match(URL_SCP_PATTERN, processed_url)
     if scp_like_match:
         hostname = scp_like_match.group(1)
         path = scp_like_match.group(2)
-        processed_url = f"ssh://git@{hostname}/{path}"
+        processed_url = f"{URL_SSH_PREFIX}{hostname}{URL_PATH_SEPARATOR}{path}"
 
     try:
         parsed = urlparse(processed_url)
@@ -39,21 +62,21 @@ def clean_and_standardize_url(url: str) -> str:
         path = parsed.path
         force_https = False
 
-        if "@" in netloc:
+        if URL_CREDENTIAL_SEPARATOR in netloc:
             force_https = True
-            netloc_parts = netloc.rsplit('@', 1)
+            netloc_parts = netloc.rsplit(URL_CREDENTIAL_SEPARATOR, 1)
             if len(netloc_parts) == 2:
                 netloc = netloc_parts[1]
             else:
-                return ""
+                return URL_EMPTY
 
-        if parsed.scheme in ("ssh", "git"):
+        if parsed.scheme in (URL_SCHEME_SSH, URL_SCHEME_GIT):
             force_https = True
 
-        final_scheme = "https" if force_https and netloc else parsed.scheme
+        final_scheme = URL_SCHEME_HTTPS if force_https and netloc else parsed.scheme
 
-        path = parsed.path.rstrip("/")
-        if path.endswith(".git"):
+        path = parsed.path.rstrip(URL_PATH_SEPARATOR)
+        if path.endswith(URL_GIT_SUFFIX):
             path = path[:-4]
 
         return urlunparse((
@@ -65,28 +88,28 @@ def clean_and_standardize_url(url: str) -> str:
             ""
         ))
     except (ValueError, IndexError):
-        return ""
+        return URL_EMPTY
 
 
 def get_repo_info(path: str | Path) -> Dict[str, str]:
     dir_path = str(path)
-    timeout = 5
+    timeout = GIT_COMMAND_TIMEOUT_SECONDS
 
     try:
         is_repo_check = subprocess.run(
-            ["git", "-C", dir_path, "rev-parse", "--is-inside-work-tree"],
+            [GIT_EXECUTABLE, GIT_CONTEXT_FLAG, dir_path, *GIT_CMD_REPO_CHECK],
             capture_output=True, text=True, check=True, timeout=timeout
         )
-        if is_repo_check.stdout.strip() != 'true':
+        if is_repo_check.stdout.strip() != GIT_TRUE_VALUE:
             raise NotGitRepositoryError(f"Path is not inside a Git work tree: {dir_path}")
 
         raw_url = subprocess.run(
-            ["git", "-C", dir_path, "config", "--get", "remote.origin.url"],
+            [GIT_EXECUTABLE, GIT_CONTEXT_FLAG, dir_path, *GIT_CMD_REMOTE_URL],
             capture_output=True, text=True, check=True, timeout=timeout
         ).stdout.strip()
 
         branch = subprocess.run(
-            ["git", "-C", dir_path, "rev-parse", "--abbrev-ref", "HEAD"],
+            [GIT_EXECUTABLE, GIT_CONTEXT_FLAG, dir_path, *GIT_CMD_CURRENT_BRANCH],
             capture_output=True, text=True, check=True, timeout=timeout
         ).stdout.strip()
 
@@ -99,20 +122,16 @@ def get_repo_info(path: str | Path) -> Dict[str, str]:
         ) from e
 
     repository_url = clean_and_standardize_url(raw_url)
-    hostname = urlparse(repository_url).hostname or ""
+    hostname = urlparse(repository_url).hostname or URL_EMPTY
 
-    repo_type = "default"
-    if "github" in hostname:
-        repo_type = "github"
-    elif "gitlab" in hostname:
-        repo_type = "gitlab"
-    elif "gitea" in hostname:
-        repo_type = "gitea"
-    elif "bitbucket.org" in hostname:
-        repo_type = "bitbucket"
+    repo_type = DEFAULT_REPOSITORY_TYPE
+    for host_marker, detected_repo_type in REPOSITORY_TYPE_BY_HOST.items():
+        if host_marker in hostname:
+            repo_type = detected_repo_type
+            break
 
     return {
-        "repository": repository_url,
-        "branch": branch,
-        "repository_type": repo_type,
+        REPO_INFO_KEY_REPOSITORY: repository_url,
+        REPO_INFO_KEY_BRANCH: branch,
+        REPO_INFO_KEY_REPOSITORY_TYPE: repo_type,
     }
