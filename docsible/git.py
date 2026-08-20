@@ -4,6 +4,11 @@ import subprocess
 from pathlib import Path
 from typing import Dict
 from urllib.parse import urlparse, urlunparse
+from docsible.constants import (
+    DEFAULT_REPOSITORY_TYPE,
+    GIT_COMMAND_TIMEOUT_SECONDS,
+    REPOSITORY_TYPE_BY_HOST,
+)
 
 
 class GitInfoError(Exception):
@@ -70,7 +75,7 @@ def clean_and_standardize_url(url: str) -> str:
 
 def get_repo_info(path: str | Path) -> Dict[str, str]:
     dir_path = str(path)
-    timeout = 5
+    timeout = GIT_COMMAND_TIMEOUT_SECONDS
 
     try:
         is_repo_check = subprocess.run(
@@ -101,15 +106,11 @@ def get_repo_info(path: str | Path) -> Dict[str, str]:
     repository_url = clean_and_standardize_url(raw_url)
     hostname = urlparse(repository_url).hostname or ""
 
-    repo_type = "default"
-    if "github" in hostname:
-        repo_type = "github"
-    elif "gitlab" in hostname:
-        repo_type = "gitlab"
-    elif "gitea" in hostname:
-        repo_type = "gitea"
-    elif "bitbucket.org" in hostname:
-        repo_type = "bitbucket"
+    repo_type = DEFAULT_REPOSITORY_TYPE
+    for host_marker, detected_repo_type in REPOSITORY_TYPE_BY_HOST.items():
+        if host_marker in hostname:
+            repo_type = detected_repo_type
+            break
 
     return {
         "repository": repository_url,

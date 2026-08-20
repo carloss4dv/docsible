@@ -7,14 +7,23 @@ from datetime import datetime
 from jinja2 import Environment, BaseLoader, FileSystemLoader
 from docsible.templates.role import ROLE_TEMPLATE
 from docsible.templates.collection import COLLECTION_TEMPLATE
+from docsible.constants import (
+    DATE_FORMAT,
+    DEFAULT_OUTPUT_FILE,
+    DEFAULT_PLAYBOOK_PATH,
+    DEFAULT_REPOSITORY_BRANCH,
+    DOCSIBLE_DEFAULT_METADATA,
+    DOCSIBLE_END_TAG,
+    DOCSIBLE_START_TAG,
+    GALAXY_FILE_NAMES,
+    TIMESTAMP_FORMAT,
+)
 from docsible.mermaid import generate_mermaid_playbook, generate_mermaid_role_tasks_per_file
 from docsible.yaml import load_yaml_generic, load_yaml_files_from_dir_custom, get_task_comments, get_task_line_numbers
 from docsible.tasks import process_special_task_keys
 from docsible.git import get_repo_info
 
-DOCSIBLE_START_TAG = "<!-- DOCSIBLE START -->"
-DOCSIBLE_END_TAG = "<!-- DOCSIBLE END -->"
-timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+timestamp = datetime.now().strftime(TIMESTAMP_FORMAT)
 
 
 def get_version():
@@ -23,19 +32,8 @@ def get_version():
 
 def manage_docsible_file_keys(docsible_path):
     default_data = {
-        'description': None,
-        'requester': None,
-        'users': None,
-        'dt_dev': None,
-        'dt_prod': None,
-        'dt_update': datetime.now().strftime('%Y/%m/%d'),
-        'version': None,
-        'time_saving': None,
-        'category': None,
-        'subCategory': None,
-        'aap_hub': None,
-        'critical': None,
-        'automation_kind': None
+        **DOCSIBLE_DEFAULT_METADATA,
+        'dt_update': datetime.now().strftime(DATE_FORMAT),
     }
     if os.path.exists(docsible_path):
         with open(docsible_path, 'r') as f:
@@ -44,7 +42,7 @@ def manage_docsible_file_keys(docsible_path):
         updated_data = {**default_data, **existing_data}
         if updated_data != existing_data:
             # Update dt_update field if docsible keys added
-            existing_data['dt_update'] = datetime.now().strftime('%Y/%m/%d')
+            existing_data['dt_update'] = datetime.now().strftime(DATE_FORMAT)
             with open(docsible_path, 'w', encoding='utf-8') as f:
                 yaml.dump(updated_data, f, default_flow_style=False)
             print(f"Updated {docsible_path} with new keys.")
@@ -121,13 +119,13 @@ def document_collection_roles(collection_path, playbook, graph, no_backup, no_do
         git_info = {}
     repository_url = git_info.get("repository") if git_info else None
     repo_branch = repo_branch or (
-        git_info.get("branch") if git_info else "main")
+        git_info.get("branch") if git_info else DEFAULT_REPOSITORY_BRANCH)
     repo_type = repo_type or (
         git_info.get("repository_type") if git_info else None)
 
     for root, dirs, files in os.walk(collection_path):
         galaxy_file = next(
-            (f for f in files if f in ['galaxy.yml', 'galaxy.yaml']), None)
+            (f for f in files if f in GALAXY_FILE_NAMES), None)
         if galaxy_file:
             galaxy_path = os.path.join(root, galaxy_file)
             with open(galaxy_path, 'r') as f:
@@ -174,7 +172,7 @@ def document_collection_roles(collection_path, playbook, graph, no_backup, no_do
 @click.command()
 @click.option('--role', '-r', default=None, help='Path to the Ansible role directory.')
 @click.option('--collection', '-c', default=None, help='Path to the Ansible collection directory.')
-@click.option('--playbook', '-p', default='tests/test.yml', help='Path to the playbook file.')
+@click.option('--playbook', '-p', default=DEFAULT_PLAYBOOK_PATH, help='Path to the playbook file.')
 @click.option('--graph', '-g', is_flag=True, help='Generate Mermaid graph for tasks.')
 @click.option('--no-backup', '-nob', is_flag=True, help='Do not backup the readme before remove.')
 @click.option('--no-docsible', '-nod', is_flag=True, help='Do not generate .docsible file and do not include it in README.md.')
@@ -183,7 +181,7 @@ def document_collection_roles(collection_path, playbook, graph, no_backup, no_do
 @click.option('--md-collection-template', '-ctpl', default=None, help='Path to the collection markdown template file.')
 @click.option('--md-role-template', '-rtpl', '--md-template', '-tpl', default=None, help='Path to the role markdown template file.')
 @click.option('--append', '-a', is_flag=True, help='Append to the existing README.md instead of replacing it.')
-@click.option('--output', '-o', default='README.md', help='Output readme file name.')
+@click.option('--output', '-o', default=DEFAULT_OUTPUT_FILE, help='Output readme file name.')
 @click.option('--repository-url', '-ru', default=None, help='Repository base URL (used for standalone roles)')
 @click.option('--repo-type', '-rt', default=None, help='Repository type: github, gitlab, gitea, etc.')
 @click.option('--repo-branch', '-rb', default=None, help='Repository branch name (e.g., main or master)')
@@ -202,7 +200,7 @@ def doc_the_role(role, collection, playbook, graph, no_backup, no_docsible, comm
             print(f"Folder {role_path} does not exist.")
             return
 
-        if playbook == 'tests/test.yml':
+        if playbook == DEFAULT_PLAYBOOK_PATH:
             playbook = os.path.join(role_path, playbook)
 
         playbook_content = None
@@ -256,7 +254,7 @@ def document_role(role_path, playbook_content, generate_graph, no_backup, no_doc
             git_info = {}
         repository_url = git_info.get("repository") if git_info else None
         repo_branch = repo_branch or (
-            git_info.get("branch") if git_info else "main")
+            git_info.get("branch") if git_info else DEFAULT_REPOSITORY_BRANCH)
         repo_type = repo_type or (
             git_info.get("repository_type") if git_info else None)
 
